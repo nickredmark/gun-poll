@@ -1,11 +1,7 @@
-import React, { useState, useRef } from "react";
-import moment from "moment";
-
-const repeat = n => Array.apply(null, Array(n));
+import React, { useState } from "react";
+import { getId } from "nicks-gun-utils";
 
 export const Poll = ({
-  id,
-  getId,
   poll,
   onCreateAnswer,
   onCreateComment,

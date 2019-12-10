@@ -1,41 +1,20 @@
 import { Poll } from "./Poll";
 import React, { useState, useEffect } from "react";
 import uuid from "uuid/v4";
+import { getPub, useGun, getUUID, getSet, getId } from "nicks-gun-utils";
 
 const Gun = require("gun/gun");
+require("gun/sea");
+require("gun/lib/radix");
+require("gun/lib/radisk");
+require("gun/lib/store");
+require("gun/lib/rindexed");
 
-const getId = element => element["_"]["#"];
-
-const useRerender = () => {
-  const [, setRender] = useState({});
-  const rerender = () => setRender({});
-  return rerender;
-};
-
-const getSet = (data, id, key) => {
-  if (!id) {
-    throw new Error("No id defined");
-  }
-  const entity = data[id];
-  if (!entity || !entity[key]) {
-    return [];
-  }
-  const set = data[entity[key]["#"]];
-  if (!set) {
-    return [];
-  }
-  const arr = Object.keys(set)
-    .filter(key => key !== "_")
-    .map(key => set[key])
-    .filter(Boolean)
-    .map(ref => data[ref["#"]])
-    .filter(Boolean);
-  return arr;
-};
-
-export const GunPoll = ({ id }) => {
+export const GunPoll = ({ id, priv, epriv }) => {
   const [gun, setGun] = useState(null);
-  const rerender = useRerender();
+  const pub = getPub(id);
+  const pair = pub && priv && { pub, priv, epriv };
+  const [data, onData, put] = useGun(Gun, gun, useState, pair);
   const [token, setToken] = useState();
 
   useEffect(() => {
@@ -51,46 +30,42 @@ export const GunPoll = ({ id }) => {
     const gun = Gun({
       peers: ["https://gunjs.herokuapp.com/gun"]
     });
+    gun.get(id).on(onData);
+    gun
+      .get(`${id}.answers`)
+      .on(onData)
+      .map()
+      .on(onData)
+      .once(answer => {
+        const answerId = getId(answer);
+        gun.get(`${answerId}.votes`).on(onData);
+        gun
+          .get(`${answerId}.comments`)
+          .on(onData)
+          .map()
+          .on(onData);
+      });
     setGun(gun);
   }, []);
-
-  useEffect(() => {
-    if (gun) {
-      gun
-        .get(id)
-        .on(rerender)
-        .get("answers")
-        .map()
-        .on(rerender)
-        .get("votes")
-        .on(rerender)
-        .back()
-        .get("comments")
-        .map()
-        .on(rerender);
-    }
-  }, [gun]);
 
   if (!gun || !token) {
     return <div>Loading...</div>;
   }
 
-  const data = gun._.graph;
-  console.log(data);
   const poll = {
     ...data[id],
-    answers: getSet(data, id, "answers")
+    answers: getSet(data, `${id}.answers`)
       .map(answer => {
+        const answerId = getId(answer);
         const res = {
           ...answer,
-          votes: data[((answer || {}).votes || {})["#"]] || {},
-          comments: getSet(data, getId(answer), "comments")
+          votes: { ...data[`${answerId}.votes`] },
+          comments: getSet(data, `${answerId}.comments`)
         };
         res.voteCount = Object.keys(res.votes)
           .filter(key => key !== "_")
           .map(key => res.votes[key])
           .filter(Boolean).length;
-        console.log(res.votes, res.voteCount);
         return res;
       })
       .sort((a, b) => b.voteCount - a.voteCount)
@@ -102,37 +77,24 @@ export const GunPoll = ({ id }) => {
       poll={poll}
       id={id}
       token={token}
-      onCreateAnswer={content =>
-        gun
-          .get(id)
-          .get("answers")
-          .set({
-            content
-          })
-      }
-      onCreateComment={(answerId, content) =>
-        gun
-          .get(answerId)
-          .get("comments")
-          .set({
-            content
-          })
-      }
-      onVote={(answerId, vote) => {
-        console.log("the vote is", vote);
-        gun
-          .get(answerId)
-          .get("votes")
-          .get(token)
-          .put(vote);
+      onCreateAnswer={content => {
+        const key = getUUID(gun);
+        const answerId = `${id}.answers.${key}`;
+        put(
+          [answerId, "content", content],
+          [`${id}.answers`, key, { "#": answerId }]
+        );
       }}
-      onSetPollTitle={title =>
-        gun
-          .get(id)
-          .get("title")
-          .put(title)
-      }
-      onUpdateEvent={(id, values) => gun.get(id).put(values)}
+      onCreateComment={(answerId, content) => {
+        const key = getUUID(gun);
+        const commentId = `${answerId}.comments.${key}`;
+        put(
+          [commentId, "content", content],
+          [`${answerId}.comments`, key, { "#": commentId }]
+        );
+      }}
+      onVote={(answerId, vote) => put([`${answerId}.votes`, token, vote])}
+      onSetPollTitle={title => put([id, "title", title])}
     />
   );
 };

@@ -1,42 +1,29 @@
-import React, { useRef } from "react";
+import React, { useEffect } from "react";
 import { hot } from "react-hot-loader/root";
 import { GunPoll } from "./components/GunPoll";
-import uuid from "uuid/v1";
 
 require("gun/lib/open");
 
 const App = () => {
-  const newId = useRef(null);
-
   const urlParams = new URLSearchParams(window.location.search);
-  const id = urlParams.get("poll");
+  const id = urlParams.get("id");
+  const hashUrlParams = new URLSearchParams(window.location.hash.substr(1));
+  const priv = hashUrlParams.get("priv");
+  const epriv = hashUrlParams.get("epriv");
+
+  useEffect(() => {
+    if (!id) {
+      window.location = `https://gun-create.nmaro.now.sh?next=${encodeURIComponent(
+        window.location.origin
+      )}`;
+    }
+  }, []);
 
   if (!id) {
-    return (
-      <div className="new-poll">
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            if (newId.current.value) {
-              window.location.href = `${window.location.origin}?poll=${newId.current.value}`;
-            }
-          }}
-        >
-          <input ref={newId} placeholder="(New) poll ID e.g. tellmewhattodo" />
-        </form>
-        or
-        <button
-          onClick={e =>
-            (window.location.href = `${window.location.origin}?poll=${uuid()}`)
-          }
-        >
-          Create new poll with random ID
-        </button>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
-  return <GunPoll id={id} />;
+  return <GunPoll id={id} priv={priv} epriv={epriv} />;
 };
 
 export default hot(App);
