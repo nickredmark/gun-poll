@@ -28,7 +28,7 @@ export const GunPoll = ({ id, priv, epriv }) => {
 
   useEffect(() => {
     const gun = Gun({
-		peers: ["https://gunjs.herokuapp.com/gun", "http://nmr.io:8765/gun"],
+      peers: ["https://gunjs.herokuapp.com/gun", "http://nmr.io:8765/gun"]
     });
     gun.get(id).on(onData);
     gun
@@ -82,7 +82,9 @@ export const GunPoll = ({ id, priv, epriv }) => {
         const answerId = `${id}.answers.${key}`;
         put(
           [answerId, "content", content],
-          [`${id}.answers`, key, { "#": answerId }]
+          [`${id}.answers`, key, { "#": answerId }],
+          [id, "updated", +new Date()],
+          [id, "lastUpdate", content]
         );
       }}
       onCreateComment={(answerId, content) => {
